@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Inference Simulators 08 — Accelerating Inference Simulators</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Geist+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1c1815;
+            --bg-card: #231e1a;
+            --bg-code: #2b2520;
+            --text-primary: #efe8dc;
+            --text-secondary: #a2978b;
+            --accent: #aabd59;
+            --accent-dim: #aabd5944;
+            --accent-glow: #aabd5933;
+            --border: #3a322b;
+            --font-display: 'Bricolage Grotesque', sans-serif;
+            --font-mono: 'Geist Mono', 'Geist Mono', monospace;
+            --font-body: 'Instrument Sans', sans-serif;
+            --max-width: 900px;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 .accent {
+            color: var(--accent);
+        }
+
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-bottom: 2rem;
+        }
+
+        /* ── Tag Pills ── */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+
+        /* ── Pipeline Flow Bar ── */
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .pipeline-arrow {
+            color: var(--accent);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        /* ── Slides ── */
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .slide p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .slide p strong {
+            color: var(--text-primary);
+        }
+
+        .slide ul, .slide ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .slide li {
+            margin-bottom: 0.4rem;
+        }
+
+        .slide li strong {
+            color: var(--text-primary);
+        }
+
+        /* ── Code Blocks ── */
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #dad1c5;
+        }
+
+        /* Syntax highlighting (manual) */
+        .kw { color: #de805a; }
+        .fn { color: #d7bbdf; }
+        .str { color: #bcdbd4; }
+        .cm { color: #a2978b; font-style: italic; }
+        .num { color: #97cdc6; }
+        .type { color: #e3b174; }
+        .dir { color: #de805a; }
+        .mac { color: #e3b174; }
+
+        /* ── Tables ── */
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:nth-child(even) td {
+            background: rgba(35,30,26,0.5);
+        }
+
+        /* ── Diagrams ── */
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .diagram-box.accent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+        }
+
+        .diagram-box.dim {
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+
+        .diagram-arrow {
+            color: var(--accent);
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        /* Vertical flow diagrams */
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-vertical .diagram-arrow {
+            font-size: 1.1rem;
+        }
+
+        /* Nested hierarchy diagram */
+        .hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .hierarchy-level {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .hierarchy-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .hierarchy-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .hierarchy-item {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .hierarchy-item.accent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+        }
+
+        /* Grid diagram */
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-grid.cols-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .diagram-grid.cols-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        .diagram-panel.accent-border {
+            border-left: 3px solid var(--accent);
+        }
+
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .diagram-panel p, .diagram-panel ul {
+            font-size: 0.85rem;
+        }
+
+        /* ── Callout Boxes ── */
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+
+        .callout p {
+            margin-bottom: 0;
+        }
+
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+
+        /* ── Tier Visual ── */
+        .tier-visual {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .tier-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .tier-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 90px;
+            text-align: right;
+        }
+
+        .tier-fill {
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 0.75rem;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            white-space: nowrap;
+            transition: width 0.6s ease;
+        }
+
+        .tier-cost {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            min-width: 70px;
+        }
+
+        /* ── Contents list ── */
+        .contents-list {
+            list-style: none;
+            padding-left: 0;
+            counter-reset: contents;
+        }
+
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .contents-list li:last-child {
+            border-bottom: none;
+        }
+
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+
+        .contents-list a {
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .contents-list a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            .slide {
+                padding: 3rem 1rem;
+                min-height: auto;
+            }
+
+            .slide-number {
+                font-size: 3rem;
+                top: 1.5rem;
+                right: 1rem;
+            }
+
+            .slide h2 {
+                font-size: 1.5rem;
+            }
+
+            .diagram-grid.cols-2,
+            .diagram-grid.cols-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .pipeline {
+                gap: 0.15rem;
+            }
+
+            .pipeline-step {
+                font-size: 0.6rem;
+                padding: 0.2rem 0.4rem;
+            }
+
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+
+            table {
+                font-size: 0.78rem;
+            }
+
+            .tier-label {
+                min-width: 60px;
+                font-size: 0.65rem;
+            }
+
+            .tier-fill {
+                font-size: 0.6rem;
+                height: 26px;
+            }
+        }
+
+        /* ── Interactive controls (added for Local LLM series) ── */
+        .control-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .control-row label {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            min-width: 180px;
+        }
+        .control-row input[type="range"] {
+            flex: 1;
+            min-width: 160px;
+            accent-color: var(--accent);
+        }
+        .control-row input[type="number"],
+        .control-row select {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-radius: 4px;
+            padding: 0.3rem 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+        .control-row .val {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 80px;
+            text-align: right;
+        }
+        .btn {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            padding: 0.4rem 0.9rem;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .btn:hover { background: rgba(170,189,89,0.2); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn.secondary {
+            background: var(--bg-code);
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+        .result-box {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            padding: 0.75rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            margin-top: 0.75rem;
+        }
+        .result-box .line-label { color: var(--text-secondary); }
+        .result-box .line-val   { color: var(--accent); font-weight: 600; }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        .metric {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            text-align: center;
+        }
+        .metric .metric-label {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .metric .metric-value {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 0.2rem;
+        }
+
+        /* Canvas / SVG containers */
+        .canvas-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+        }
+        .canvas-wrap canvas,
+        .canvas-wrap svg {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+
+        /* Small inline badge */
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: middle;
+            margin-left: 0.3rem;
+        }
+        .badge.ok    { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .badge.warn  { border-color: #e3b174; color: #e3b174; background: rgba(227,177,116,0.08); }
+        .badge.bad   { border-color: #de805a; color: #de805a; background: rgba(222,128,90,0.08); }
+
+
+        /* ── LLM Inference Simulators additions ── */
+        .canvas-wrap canvas { image-rendering: auto; display: block; width: 100%; height: auto; }
+        .canvas-wrap svg { max-width: 100%; height: auto; }
+        .ladder { display: grid; gap: 0.4rem; margin: 1.25rem 0; }
+        .ladder-row {
+            display: grid; grid-template-columns: 11rem 1fr 7.5rem; gap: 0.75rem; align-items: center;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+            padding: 0.55rem 0.85rem; font-size: 0.88rem;
+        }
+        .ladder-row .rung { font-family: var(--font-display); font-weight: 600; color: var(--accent); }
+        .ladder-row .speed { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); text-align: right; }
+        .res-list { list-style: none; padding: 0; margin: 0.75rem 0; }
+        .res-list li { padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+        .res-list li:last-child { border-bottom: none; }
+        .res-list .what { color: var(--text-secondary); display: block; font-size: 0.86rem; margin-top: 0.15rem; }
+        .res-list a { color: var(--accent); text-decoration: none; }
+        .res-list a:hover { text-decoration: underline; }
+        .qa { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin: 0.6rem 0; padding: 0.2rem 1rem; }
+        .qa summary { cursor: pointer; padding: 0.6rem 0; font-weight: 600; }
+        .qa p, .qa ul { margin-bottom: 0.75rem; font-size: 0.92rem; }
+        .sim-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.4rem 1.25rem; }
+        .chart-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+        .chart-title { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem; }
+        .slide a { color: var(--accent); }
+        @media (max-width: 640px) {
+            .ladder-row { grid-template-columns: 1fr; gap: 0.2rem; }
+            .ladder-row .speed { text-align: left; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="hero">
+    <div class="series-label">LLM Inference Simulators &mdash; Presentation 08</div>
+    <h1><span class="accent">Accelerating</span> Inference Simulators</h1>
+    <p class="subtitle">Making this kind of simulator fast without changing its answers: event abstraction, incremental state, lazy bookkeeping, exact macro-stepping, probe discipline, compiled kernels, parallel and multi-fidelity sweeps, surrogates, sampling, and parallel discrete-event simulation &mdash; each measured on the companion simulator.</p>
+
+    <div class="tags">
+        <span class="tag">Event abstraction</span>
+        <span class="tag">Macro-stepping</span>
+        <span class="tag">Profiling</span>
+        <span class="tag">Multi-fidelity</span>
+        <span class="tag">PDES</span>
+        <span class="tag">Rust / PyO3</span>
+    </div>
+
+    <div class="pipeline">
+        <span class="pipeline-step">Profile</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Fewer events</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Cheaper events</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Parallel runs</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Smarter search</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We'll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">Why Simulator Speed Matters, and a Taxonomy</a></li>
+        <li><a href="#slide-02">Step Zero: Profile</a></li>
+        <li><a href="#slide-03">Fewer Events: Choose the Abstraction</a></li>
+        <li><a href="#slide-04">Cheaper Events: Incremental State and Hoisting</a></li>
+        <li><a href="#slide-05">Exact Macro-Stepping</a></li>
+        <li><a href="#slide-06">Measured: What Each Technique Bought</a></li>
+        <li><a href="#slide-07">The Cost of Watching: Probes and Traces</a></li>
+        <li><a href="#slide-08">Faster Execution: Compilers, Runtimes, Rewrites</a></li>
+        <li><a href="#slide-09">Parallel Runs</a></li>
+        <li><a href="#slide-10">Smarter Experiments: Multi-Fidelity, Search, Surrogates</a></li>
+        <li><a href="#slide-11">Sampling, Checkpoints and Mode Switching</a></li>
+        <li><a href="#slide-12">Parallel Discrete-Event Simulation</a></li>
+        <li><a href="#slide-13">Accelerating the RTL End</a></li>
+        <li><a href="#slide-14">Interactive: Amdahl's Law for Simulators</a></li>
+        <li><a href="#slide-15">What to Take Away</a></li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>Why Simulator Speed Matters, and a Taxonomy</h2>
+    <p>A simulator's speed decides how many questions the architecture team can ask. At one minute per run, a 1,000-point design-space sweep is an overnight job; at one second it is a coffee break, and people start asking better questions. Speed is a feature, but only if the answers do not change.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Family</th><th>Techniques</th><th>Changes answers?</th></tr>
+        <tr><td><strong>Fewer events</strong></td><td>Coarser event granularity; macro-stepping; analytic sub-models</td><td>Exact if nothing observable happens inside the merged events</td></tr>
+        <tr><td><strong>Cheaper events</strong></td><td>Incremental state, hoisted constants, lazy bookkeeping, fewer allocations</td><td>No (pure refactoring)</td></tr>
+        <tr><td><strong>Cheaper probes</strong></td><td>Lower sampling rates, streaming statistics, windowed tracing</td><td>Only the detail of the outputs</td></tr>
+        <tr><td><strong>Faster execution</strong></td><td>PyPy, Cython, C++ or Rust kernels</td><td>No, if verified differentially</td></tr>
+        <tr><td><strong>Parallelism across runs</strong></td><td>Process pools, job arrays, CI farms</td><td>No</td></tr>
+        <tr><td><strong>Parallelism within a run</strong></td><td>Conservative or optimistic PDES</td><td>No, but it is hard to get right</td></tr>
+        <tr><td><strong>Smarter experiments</strong></td><td>Analytic bounds, bisection, Bayesian optimisation, surrogates, common random numbers</td><td>Fewer runs for the same conclusion</td></tr>
+        <tr><td><strong>Sampling</strong></td><td>SimPoint-style representative regions, statistical sampling, checkpoints</td><td>Yes, with quantified error</td></tr>
+    </table>
+    </div>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>Step Zero: Profile</h2>
+    <p>Guessing where a simulator spends its time is usually wrong. <code>cProfile</code> on the baseline (Llama-3-70B, 2,000 requests, 511 simulated seconds, before the power model was added) showed:</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Function</th><th>Own time</th><th>What it is</th></tr>
+        <tr><td><code>decode_step_done</code></td><td>0.32 s</td><td>Per-sequence token bookkeeping after every decode step</td></tr>
+        <tr><td><code>list.append</code> (1.09 M calls)</td><td>0.17 s</td><td>Recording every inter-token latency</td></tr>
+        <tr><td><code>decode_once</code></td><td>0.13 s</td><td>Rebuilding the context list each step</td></tr>
+        <tr><td>Cost model (<code>decode</code>, <code>_time</code>, properties)</td><td>&asymp;0.17 s</td><td>Recomputing model constants and allocating a result object every step</td></tr>
+        <tr><td>SimPy kernel (<code>step</code>, <code>_resume</code>)</td><td>&asymp;0.11 s</td><td>The event loop itself</td></tr>
+        <tr><td><code>sampler</code></td><td>0.06 s</td><td>A passive probe</td></tr>
+    </table>
+    </div>
+    <div class="callout">
+        <div class="callout-label">The lesson</div>
+        <p>The event kernel is a small fraction. Time goes into <em>model code that runs per sequence per step</em>. That points to two fixes: do less per step (incremental state), and stop touching every sequence on every step (lazy bookkeeping).</p>
+    </div>
+    <p style="font-size:0.85rem;">Tools: <code>cProfile</code> + <code>snakeviz</code> for call trees; <code>py-spy</code> for sampling without instrumentation overhead; <code>perf</code> and flame graphs for compiled cores.</p>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>Fewer Events: Choose the Abstraction</h2>
+    <p>The biggest acceleration happens before any optimisation: choosing what an event <em>is</em>. Nothing observable to the scheduler happens inside a decode step, so one event per batch step is exact for serving metrics.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Event granularity, same 511 s of serving</th><th>Events</th><th>Relative</th></tr>
+        <tr><td>One per batch step (the simulator)</td><td>36,605</td><td>1&times;</td></tr>
+        <tr><td>One per generated token</td><td>505,895</td><td>14&times;</td></tr>
+        <tr><td>One per layer per step</td><td>2,928,400</td><td>80&times;</td></tr>
+        <tr><td>One per clock cycle at 1.5 GHz</td><td>&asymp;7.7 &times; 10<sup>11</sup></td><td>&asymp;2 &times; 10<sup>7</sup>&times;</td></tr>
+    </table>
+    </div>
+    <p>At batch-step granularity the plain SimPy model already runs at <strong>about 660&ndash;780&times; real time</strong> on a laptop, depending on how much the cost model computes per step. The rule from deck 01 applies again: go finer only where the question needs it, for example per-layer events when studying layer-wise KV streaming.</p>
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>Cheaper Events: Incremental State and Hoisting</h2>
+    <div class="diagram-grid cols-2">
+        <div class="code-block" style="margin:0;">
+            <div class="code-header">Before: O(batch) per step, objects everywhere</div>
+            <pre><code>ctx = [r.prompt_len + r.tokens_out
+       <span class="kw">for</span> r <span class="kw">in</span> self.running]
+cost = self.cost.decode(ctx)       <span class="cm"># sums the list,</span>
+                                    <span class="cm"># recomputes params,</span>
+                                    <span class="cm"># allocates StepCost</span>
+<span class="kw">for</span> r <span class="kw">in</span> self.running:              <span class="cm"># touches every sequence</span>
+    r.itls.append(now - r.last_token)
+    r.tokens_out += <span class="num">1</span>
+    r.last_token = now</code></pre>
+        </div>
+        <div class="code-block" style="margin:0;">
+            <div class="code-header">After: O(1) per step</div>
+            <pre><code><span class="cm"># once, outside the loop</span>
+fa, fb = <span class="num">2</span>*m.matmul_params, <span class="num">4</span>*m.n_layers*m.d_model
+w, kv  = m.weight_bytes_total, m.kv_bytes_per_token
+
+<span class="cm"># per step: a running sum and arithmetic</span>
+flops  = fa*b + fb*ctx
+nbytes = w + (ctx + b)*kv
+dt = max(flops/fr, nbytes/br) + ovh
+ctx += b                            <span class="cm"># every sequence grew by 1</span>
+step_end.append(t)                  <span class="cm"># one record per instance</span></code></pre>
+        </div>
+    </div>
+    <ul>
+        <li><strong>Incremental state:</strong> decode cost depends only on batch size and <em>total</em> context, so keep a running sum (+b per step, adjusted on admit and finish).</li>
+        <li><strong>Hoisting:</strong> model constants become <code>cached_property</code> or locals; no recomputation per step.</li>
+        <li><strong>Lazy bookkeeping:</strong> store the end time of each step once per instance. A sequence's token count, last-token time and inter-token latencies are reconstructed from that array when it finishes. Finishes are found with a heap keyed by finish-step index, which turns "check every sequence every step" into "pop when due".</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>Exact Macro-Stepping</h2>
+    <p>Between two <em>state changes</em> (an admission or a finish) a decode instance's future is deterministic: the batch is fixed and the context grows by one per step. So compute the whole run of steps in a tight loop and give SimPy <strong>one</strong> timeout for all of them. If new work arrives mid-way, interrupt: let the step in flight finish and admit the newcomer at that boundary, exactly as the baseline would.</p>
+    <div class="canvas-wrap">
+        <svg viewBox="0 0 720 150" width="720" height="150" xmlns="http://www.w3.org/2000/svg">
+            <style>
+                .s  { fill: rgba(170,189,89,0.45); stroke: #aabd59; }
+                .w  { fill: rgba(222,128,90,0.18); stroke: #de805a; stroke-dasharray: 3 2; }
+                .t  { fill: #efe8dc; font-family: 'Geist Mono', monospace; font-size: 10.5px; }
+                .d  { fill: #a2978b; font-family: 'Geist Mono', monospace; font-size: 10px; }
+                .ar { stroke: #e3b174; stroke-width: 1.5; marker-end: url(#m7); }
+            </style>
+            <defs><marker id="m7" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#e3b174"/></marker></defs>
+            <text x="10" y="30" class="d">baseline</text>
+            <g id="m7-base"></g>
+            <text x="10" y="85" class="d">macro-step</text>
+            <rect x="90" y="68" width="324" height="26" class="s"/><text x="96" y="85" class="t">one timeout: steps 0..8 committed together</text>
+            <rect x="414" y="68" width="216" height="26" class="w"/><text x="420" y="85" class="d">planned, discarded (speculation)</text>
+            <line x1="396" y1="118" x2="396" y2="98" class="ar"/><text x="300" y="132" class="d">new request arrives: interrupt</text>
+            <text x="420" y="132" class="d">step in flight finishes at 414, admit, re-plan</text>
+            <script>
+                (function(){ const g = document.getElementById('m7-base');
+                    for (let i = 0; i < 15; i++) { const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+                        r.setAttribute('x', 90 + i * 36); r.setAttribute('y', 14); r.setAttribute('width', 34); r.setAttribute('height', 26); r.setAttribute('class','s'); g.appendChild(r); } })();
+            </script>
+        </svg>
+    </div>
+    <div class="code-block">
+        <div class="code-header">sim.py, FastDecodeInstance.run (core)</div>
+        <pre><code>k = min(steps_until_next_finish, horizon)          <span class="cm"># bounded look-ahead</span>
+ends = plan(k)                                     <span class="cm"># tight arithmetic loop</span>
+self._macro = <span class="kw">True</span>
+<span class="kw">try</span>:
+    <span class="kw">yield</span> env.timeout(ends[-<span class="num">1</span>] - env.now); done = k
+    horizon = min(<span class="num">4096</span>, horizon * <span class="num">2</span>)                <span class="cm"># uninterrupted: look further</span>
+<span class="kw">except</span> simpy.Interrupt:                          <span class="cm"># submit() interrupted us</span>
+    j = bisect.bisect_right(ends, env.now)         <span class="cm"># the step in flight</span>
+    <span class="kw">yield</span> env.timeout(ends[j] - env.now); done = j + <span class="num">1</span>
+    horizon = max(<span class="num">8</span>, <span class="num">2</span> * done)                      <span class="cm"># interrupted: look less far</span>
+self.commit(ends[:done], ...)</code></pre>
+    </div>
+    <ul>
+        <li><strong>Speculation has a cost.</strong> The first version planned all the way to the next finish and threw away about half of what it planned (68,000 planned steps for 35,000 used), the same trade-off as rollback in optimistic PDES. An adaptive look-ahead fixed it.</li>
+        <li><strong>Exactness is tested, not hoped for.</strong> Every timestamp and every inter-token latency is bit-identical to the baseline across configurations (<code>test_fast_forward_is_exact</code>), because the step times are summed in the same order.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>Measured: What Each Technique Bought</h2>
+    <p>From <code>examples/benchmark_acceleration.py</code> on an 8-core laptop (Python 3.12, SimPy 4.1), with the power model (deck 07) enabled. Every speed-up is checked for identical results.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Technique</th><th>Scenario</th><th>Before</th><th>After</th><th>Gain</th><th>Answers</th></tr>
+        <tr><td>Event abstraction (step, not token)</td><td>Defaults, 2,000 requests</td><td>506k events</td><td>36.6k events</td><td>14&times; fewer events</td><td>Same model</td></tr>
+        <tr><td>Fast path (incremental + lazy + macro)</td><td>Defaults (1P1D, 4 req/s)</td><td>0.84 s</td><td>0.37 s</td><td><strong>2.3&times;</strong></td><td>Bit-identical</td></tr>
+        <tr><td>Fast path</td><td>1k-token outputs, 1 req/s</td><td>2.59 s</td><td>1.02 s</td><td><strong>2.5&times;</strong></td><td>Bit-identical</td></tr>
+        <tr><td>Fast path</td><td>2P2D, 6 req/s</td><td>0.88 s</td><td>0.42 s</td><td><strong>2.1&times;</strong></td><td>Bit-identical</td></tr>
+        <tr><td>Probe rate (5 ms &rarr; off)</td><td>Defaults</td><td>1.25 s</td><td>0.66 s</td><td>1.9&times;</td><td>Same metrics, less timeline</td></tr>
+        <tr><td>Parallel sweep, 8 processes</td><td>8 rates</td><td>2.00 s</td><td>1.05 s</td><td>1.9&times;</td><td>Identical</td></tr>
+        <tr><td>Analytic bracket + bisection</td><td>Max load at 90% SLO</td><td>40 runs, 10.7 s</td><td>7 runs, 1.65 s</td><td><strong>6.5&times;</strong></td><td>5.97 vs 5.75 req/s (grid step 0.25)</td></tr>
+    </table>
+    </div>
+    <div class="callout">
+        <div class="callout-label">Reading the numbers honestly</div>
+        <p>Macro-stepping pays most when there are many steps per state change (long outputs, few arrivals per instance); with frequent arrivals it is cut short often. Adding the power model lowered the fast path's gain from 2.4&ndash;3.1&times; to 2.0&ndash;2.6&times;: the per-step DVFS and energy arithmetic is work macro-stepping cannot remove. Model fidelity costs simulator speed, and Amdahl's law (slide 14) says exactly how much. The parallel sweep is far below 8&times; because each run takes only about 0.25 s, so process start-up and data transfer dominate; with minute-long runs it approaches the core count. The largest gain came from doing fewer simulations, not faster ones.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>The Cost of Watching: Probes and Traces</h2>
+    <p>Sampling the system every 5 ms of simulated time nearly <strong>doubled</strong> run time (1.25 s against 0.66 s with sampling off). Probes are code, and code costs time.</p>
+    <ul>
+        <li><strong>Sample on events, not on a clock,</strong> where you can: time-weighted integrals updated only when state changes are exact and cost O(changes).</li>
+        <li><strong>Streaming statistics</strong> (HDR histograms, t-digests, Welford's running mean and variance) replace per-sample lists, cutting memory and append cost.</li>
+        <li><strong>Trace selectively:</strong> a time window, one instance, or only steps longer than a threshold. Make tracing a configuration switch with zero cost when off (the simulator checks <code>tracer.enabled</code> before formatting anything).</li>
+        <li><strong>Keep probes passive</strong> so switching them off cannot change results; a test that compares metrics with probes on and off enforces it.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>Faster Execution: Compilers, Runtimes, Rewrites</h2>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Option</th><th>Effort</th><th>Typical fit</th><th>Caveat</th></tr>
+        <tr><td><strong>PyPy</strong></td><td>None (if dependencies allow)</td><td>Pure-Python, generator-heavy SimPy models</td><td>C-extension dependencies; measure, as gains vary</td></tr>
+        <tr><td><strong>Cython / mypyc</strong></td><td>Low to medium</td><td>Hot model functions with typed loops</td><td>Build step; the hot path must be type-annotated to gain much</td></tr>
+        <tr><td><strong>Numba</strong></td><td>Low</td><td>Numerical kernels (cost models, vectorised analytics)</td><td>Poor fit for generators and object-heavy event code</td></tr>
+        <tr><td><strong>NumPy / JAX vectorisation</strong></td><td>Medium</td><td>Analytical layers evaluated over thousands of configurations at once</td><td>Only for the closed-form parts</td></tr>
+        <tr><td><strong>C++ core + pybind11</strong></td><td>High</td><td>The event loop and models, with Python configuration</td><td>Two languages to maintain; the usual industry end state</td></tr>
+        <tr><td><strong>Rust core + PyO3/maturin</strong></td><td>High</td><td>As C++, with memory safety and easy packaging</td><td>Team skills; ecosystem smaller than C++'s</td></tr>
+    </table>
+    </div>
+    <p>Whatever the route, <strong>keep the Python model as the reference</strong> and add a differential test in the style of <code>test_javascript_port_matches_python</code>: the compiled core must reproduce the reference exactly on a fixed set of workloads. That test is what makes a rewrite safe.</p>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>Parallel Runs</h2>
+    <p>Sweeps, replications and searches are made of independent runs. Parallelising across runs is the simplest and most reliable speed-up there is.</p>
+    <div class="code-block">
+        <div class="code-header">search.py: a parallel sweep is one line of concurrency</div>
+        <pre><code><span class="kw">def</span> <span class="fn">sweep</span>(cfg, wl, rates, workers=<span class="num">1</span>):
+    jobs = [(cfg, wl, r) <span class="kw">for</span> r <span class="kw">in</span> rates]
+    <span class="kw">if</span> workers &lt;= <span class="num">1</span>:
+        <span class="kw">return</span> [_attainment(j) <span class="kw">for</span> j <span class="kw">in</span> jobs]
+    <span class="kw">with</span> ProcessPoolExecutor(max_workers=workers) <span class="kw">as</span> ex:      <span class="cm"># processes, not threads: the GIL</span>
+        <span class="kw">return</span> list(ex.map(_attainment, jobs))</code></pre>
+    </div>
+    <ul>
+        <li><strong>Processes, not threads</strong>, for CPU-bound Python (the GIL). Free-threaded CPython builds are changing this, but processes remain the safe default.</li>
+        <li><strong>Amdahl and overheads:</strong> 8 processes gave 1.9&times; on runs of about 0.25 s. Batch small runs into larger jobs, or reuse workers across many runs.</li>
+        <li><strong>Seeds are part of the job</strong>, never drawn from a shared generator, so parallel results equal serial ones (the benchmark asserts it).</li>
+        <li><strong>Scale out</strong> with job arrays on a cluster, Jenkins agents, or Ray and Dask when sweeps outgrow one machine.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-10">
+    <div class="slide-number">10</div>
+    <h2>Smarter Experiments: Multi-Fidelity, Search, Surrogates</h2>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Multi-fidelity bracketing</h4>
+            <p>A closed-form capacity bound costs microseconds. For the defaults it says prefill caps throughput at 7.49 req/s (decode 28.6, link 74.5). The simulator then only searches below that ceiling, because the bound is optimistic by construction.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Bisection, not grids</h4>
+            <p>SLO attainment falls with load, so bisection on the 90% threshold converged in 7 simulations to 5.97 req/s. A 0.25-step grid needed 40 to say 5.75. Add a tolerance for the noise in tail metrics, or bisect on the mean of a few replications.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Bayesian optimisation</h4>
+            <p>For many parameters (prefill:decode ratio, TP degree, batch caps, link), fit a Gaussian-process surrogate to completed runs and choose the next run to maximise expected improvement in goodput per GPU. It typically needs far fewer runs than grids, and libraries such as Optuna and Ax make it routine.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Learned surrogates and early stopping</h4>
+            <p>Vidur learns operator runtimes so the simulator need not profile every shape. Going further, a regressor trained on simulator outputs can screen thousands of configurations before the simulator confirms the best few. Early stopping aborts a run once its SLO verdict is statistically certain.</p>
+        </div>
+    </div>
+    <div class="callout">
+        <div class="callout-label">And reuse randomness</div>
+        <p>Common random numbers (deck 06) cut the replications needed to compare two designs, often a bigger saving than any code optimisation.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-11">
+    <div class="slide-number">11</div>
+    <h2>Sampling, Checkpoints and Mode Switching</h2>
+    <p>Detailed simulators (cycle-level, or serving simulators with very fine models) cannot afford to simulate everything. Computer architecture solved this two decades ago.</p>
+    <ul>
+        <li><strong>SimPoint</strong> (Sherwood et al., 2002) clusters execution intervals by their basic-block vectors, simulates one representative per cluster in detail, and weights the results.</li>
+        <li><strong>SMARTS</strong> (Wunderlich et al., 2003) samples many short detailed windows statistically, keeps caches and predictors warm in between with functional simulation, and reports a confidence interval on the estimate.</li>
+        <li><strong>Mode switching</strong> (fast-forward then detail): run the uninteresting part (warm-up, or the hours of steady state you already understand) in a fast mode, then switch to the detailed model for the measurement window. gem5 does this with CPU-model switching; a serving simulator can run warm-up with an analytic decode model and switch to the full model.</li>
+        <li><strong>Checkpoint and restore:</strong> save the simulator state at the end of warm-up and fork many experiments from it. Serialisable state is a design decision to make early.</li>
+    </ul>
+    <p>For LLM serving the natural units to sample are <em>traffic regimes</em> (quiet, typical, burst), each simulated in detail and weighted by how often it occurs in production traces.</p>
+</section>
+
+<section class="slide" id="slide-12">
+    <div class="slide-number">12</div>
+    <h2>Parallel Discrete-Event Simulation</h2>
+    <p>When one run is too big for one core, split the model into <em>logical processes</em> (LPs) that exchange timestamped messages.</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Conservative (Chandy&ndash;Misra&ndash;Bryant)</h4>
+            <p>An LP processes an event only when it is certain no earlier message can arrive. That needs <strong>lookahead</strong>: a minimum delay on every link between LPs. Physical link latency is natural lookahead; null messages prevent deadlock. SST and parallel gem5 work this way.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Optimistic (Time Warp)</h4>
+            <p>LPs run ahead speculatively and <strong>roll back</strong> when a straggler message arrives in their past, sending anti-messages to cancel what they sent. More parallelism, but state saving and rollback cost memory and time: the macro-stepping trade-off writ large.</p>
+        </div>
+    </div>
+    <div class="callout">
+        <div class="callout-label">Why this simulator does not need it</div>
+        <p>Each event is tiny and the pools are tightly coupled through the routers, so synchronisation would cost more than it saves. PDES pays off for large models with many loosely coupled components and real lookahead: a datacentre of accelerators, a large NoC, a full SoC with many cores. Parallelism across runs comes first.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-13">
+    <div class="slide-number">13</div>
+    <h2>Accelerating the RTL End</h2>
+    <p>The same ideas apply when the simulator under pressure is RTL, which is where pre-tape-out verification spends its compute.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Technique</th><th>What it does</th></tr>
+        <tr><td><strong>Verilator</strong></td><td>Compiles synthesisable SystemVerilog to optimised, optionally multi-threaded C++: a cycle-based (not event-driven) model, often much faster than interpretive event-driven simulators on large designs</td></tr>
+        <tr><td><strong>Smaller RTL islands</strong></td><td>Co-simulate only the block under test in RTL, with the rest of the system in TLM or the Python model (deck 01)</td></tr>
+        <tr><td><strong>Emulation</strong></td><td>Palladium, Veloce, ZeBu: around 1 MHz, enough to run real software and long workloads</td></tr>
+        <tr><td><strong>FPGA prototyping</strong></td><td>Tens of MHz; the fastest pre-silicon platform, at the cost of debug visibility and partitioning effort</td></tr>
+        <tr><td><strong>Hybrid fast-forward</strong></td><td>Boot and warm up in a virtual platform, checkpoint, then transfer state to emulation or RTL for the window of interest</td></tr>
+        <tr><td><strong>Regression farm discipline</strong></td><td>Prioritise tests by coverage gained per CPU hour; run the expensive tiers nightly</td></tr>
+    </table>
+    </div>
+</section>
+
+<section class="slide" id="slide-14">
+    <div class="slide-number">14</div>
+    <h2>Interactive: Amdahl's Law for Simulators</h2>
+    <p>Every technique speeds up only the fraction of time it touches. Set the profile shares (they are normalised) and the speed-up of each fix, and see the end-to-end gain. The defaults approximate the profile on slide 02 and the measured gains.</p>
+    <div class="control-panel">
+        <div class="sim-grid">
+            <div class="control-row"><label for="am-f1">Per-sequence bookkeeping %</label><input type="range" id="am-f1" min="0" max="100" value="45"><span class="val" id="am-f1-val">45</span></div>
+            <div class="control-row"><label for="am-s1">&hellip; speed-up (lazy)</label><input type="range" id="am-s1" min="1" max="50" value="6"><span class="val" id="am-s1-val">6</span></div>
+            <div class="control-row"><label for="am-f2">Cost model %</label><input type="range" id="am-f2" min="0" max="100" value="15"><span class="val" id="am-f2-val">15</span></div>
+            <div class="control-row"><label for="am-s2">&hellip; speed-up (hoist/inline)</label><input type="range" id="am-s2" min="1" max="50" value="3"><span class="val" id="am-s2-val">3</span></div>
+            <div class="control-row"><label for="am-f3">Event kernel %</label><input type="range" id="am-f3" min="0" max="100" value="20"><span class="val" id="am-f3-val">20</span></div>
+            <div class="control-row"><label for="am-s3">&hellip; speed-up (macro-steps)</label><input type="range" id="am-s3" min="1" max="50" value="5"><span class="val" id="am-s3-val">5</span></div>
+            <div class="control-row"><label for="am-f4">Everything else %</label><input type="range" id="am-f4" min="0" max="100" value="20"><span class="val" id="am-f4-val">20</span></div>
+            <div class="control-row"><label for="am-par">Parallel runs (workers)</label><input type="range" id="am-par" min="1" max="64" value="8"><span class="val" id="am-par-val">8</span></div>
+            <div class="control-row"><label for="am-ovh">Serial overhead per run (% of run)</label><input type="range" id="am-ovh" min="0" max="100" value="30"><span class="val" id="am-ovh-val">30</span></div>
+        </div>
+        <div class="metric-grid">
+            <div class="metric"><div class="metric-label">Single-run speed-up</div><div class="metric-value" id="am-single">&mdash;</div></div>
+            <div class="metric"><div class="metric-label">Upper limit (others &rarr; &infin;)</div><div class="metric-value" id="am-limit">&mdash;</div></div>
+            <div class="metric"><div class="metric-label">Sweep speed-up vs serial baseline</div><div class="metric-value" id="am-sweep">&mdash;</div></div>
+        </div>
+    </div>
+    <script>
+    (function(){
+        const $ = id => document.getElementById(id), ids = ['am-f1','am-s1','am-f2','am-s2','am-f3','am-s3','am-f4','am-par','am-ovh'];
+        function rec(){
+            ids.forEach(id => $(id + '-val').textContent = $(id).value);
+            const f = [1,2,3,4].map(i => +$('am-f' + i).value), tot = f.reduce((a, b) => a + b, 0) || 1;
+            const s = [+$('am-s1').value, +$('am-s2').value, +$('am-s3').value, 1];
+            const t = f.reduce((a, fi, i) => a + fi / tot / s[i], 0);
+            const single = 1 / t, limit = 1 / (f[3] / tot || 1e-9);
+            const w = +$('am-par').value, o = +$('am-ovh').value / 100;
+            const sweep = single / (1 / w + o);      // per run: parallel work c/w plus serial overhead o*c
+            $('am-single').textContent = single.toFixed(1) + '×';
+            $('am-limit').textContent = isFinite(limit) && limit < 1e6 ? limit.toFixed(1) + '×' : '∞';
+            $('am-sweep').textContent = sweep.toFixed(1) + '×';
+        }
+        ids.forEach(id => $(id).addEventListener('input', rec)); rec();
+    })();
+    </script>
+    <p style="font-size:0.85rem;">The sweep figure models a serial overhead per run (dispatch, pickling, result collection) that parallelism cannot hide: speed-up = single &divide; (1/workers + overhead). With the defaults it comes out well below the worker count, as measured on slide 06.</p>
+</section>
+
+<section class="slide" id="slide-15">
+    <div class="slide-number">15</div>
+    <h2>What to Take Away</h2>
+    <ul>
+        <li><strong>Profile first.</strong> Time usually goes to model code per entity per step, not to the event kernel.</li>
+        <li><strong>The biggest win is the abstraction:</strong> one event per batch step instead of per token or per layer.</li>
+        <li><strong>Incremental state, lazy bookkeeping and exact macro-stepping</strong> gave 2.0&ndash;2.6&times; with bit-identical answers, proven by differential tests.</li>
+        <li><strong>Speculation has a price:</strong> bound the look-ahead, as in optimistic PDES.</li>
+        <li><strong>Doing fewer runs beats running faster:</strong> analytic brackets plus bisection gave 6.5&times;; Bayesian optimisation and common random numbers go further.</li>
+        <li><strong>Parallel across runs before parallel within a run.</strong></li>
+        <li><strong>Keep a reference implementation</strong> and test every accelerated path against it.</li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Next</div>
+        <p>Deck 09 connects the simulator to the outside world: PyTorch, ONNX Runtime and HEIR.</p>
+    </div>
+</section>
+
+<!-- ════════════════════════════════════ Footer ════════════════════════════════════ -->
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Inference_Simulators">LLM Inference Simulators series</a> &middot; code: <a href="https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim">Disaggregated_Inference_Sim</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://brendanjameslynskey.github.io/InfSim_07_Power_and_Energy/">&larr; 07 Power &amp; Energy in Inference Simulators</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/InfSim_09_Framework_Integration/">09 From PyTorch, ONNX &amp; HEIR to a Simulator &rarr;</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://github.com/BrendanJamesLynskey/LLMs#hardware--inference">Back to the LLMs hub</a></p>
+</footer>
+
+<script>
+    // Smooth scroll for TOC links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    // Subtle fade-in on scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+
+</body>
+</html>
