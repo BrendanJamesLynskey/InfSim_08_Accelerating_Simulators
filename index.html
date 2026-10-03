@@ -892,13 +892,13 @@
     <div class="table-wrap">
     <table>
         <tr><th>Event granularity, same 511 s of serving</th><th>Events</th><th>Relative</th></tr>
-        <tr><td>One per batch step (the simulator)</td><td>36,605</td><td>1&times;</td></tr>
+        <tr><td>One per batch step (the simulator)</td><td>37,099</td><td>1&times;</td></tr>
         <tr><td>One per generated token</td><td>505,895</td><td>14&times;</td></tr>
-        <tr><td>One per layer per step</td><td>2,928,400</td><td>80&times;</td></tr>
+        <tr><td>One per layer per step</td><td>2,967,920</td><td>80&times;</td></tr>
         <tr><td>One per clock cycle at 1.5 GHz</td><td>&asymp;7.7 &times; 10<sup>11</sup></td><td>&asymp;2 &times; 10<sup>7</sup>&times;</td></tr>
     </table>
     </div>
-    <p>At batch-step granularity the plain SimPy model already runs at <strong>about 660&ndash;780&times; real time</strong> on a laptop, depending on how much the cost model computes per step. The rule from deck 01 applies again: go finer only where the question needs it, for example per-layer events when studying layer-wise KV streaming.</p>
+    <p>At batch-step granularity the plain SimPy model already runs at <strong>about 840&times; real time</strong> on a desktop i7-3770 (660&ndash;780&times; when first measured, on the same model before its 2026-10-03 correction; speed depends on how much the cost model computes per step and on the machine's load). The rule from deck 01 applies again: go finer only where the question needs it, for example per-layer events when studying layer-wise KV streaming.</p>
 </section>
 
 <section class="slide" id="slide-04">
@@ -921,11 +921,13 @@ cost = self.cost.decode(ctx)       <span class="cm"># sums the list,</span>
             <div class="code-header">After: O(1) per step</div>
             <pre><code><span class="cm"># once, outside the loop</span>
 fa, fb = <span class="num">2</span>*m.matmul_params, <span class="num">4</span>*m.n_layers*m.d_model
-w, kv  = m.weight_bytes_total, m.kv_bytes_per_token
+w  = m.weight_bytes_streamed   <span class="cm"># layers + LM head</span>
+er = m.embedding_row_bytes     <span class="cm"># 1 row per token</span>
+kv = m.kv_bytes_per_token
 
 <span class="cm"># per step: a running sum and arithmetic</span>
-flops  = fa*b + fb*ctx
-nbytes = w + (ctx + b)*kv
+flops  = fa*b + fb*(ctx + b)   <span class="cm"># + itself</span>
+nbytes = w + b*er + (ctx + b)*kv
 dt = max(flops/fr, nbytes/br) + ovh
 ctx += b                            <span class="cm"># every sequence grew by 1</span>
 step_end.append(t)                  <span class="cm"># one record per instance</span></code></pre>
@@ -989,29 +991,29 @@ self.commit(ends[:done], ...)</code></pre>
 <section class="slide" id="slide-06">
     <div class="slide-number">06</div>
     <h2>Measured: What Each Technique Bought</h2>
-    <p>From <code>examples/benchmark_acceleration.py</code> on an 8-core laptop (Python 3.12, SimPy 4.1), with the power model (deck 07) enabled. Every speed-up is checked for identical results.</p>
+    <p>From <code>examples/benchmark_acceleration.py</code> on an i7-3770 desktop (4 cores, 8 threads; Python 3.12, SimPy 4.1), with the power model (deck 07) enabled, as recorded in <a href="https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim/blob/main/examples/results.md">examples/results.md</a>. Every speed-up is checked for identical results. Rerun on 2026-10-03 after the cost model was corrected: steps no longer read the whole embedding table, and decode attention includes each token's attention to itself (<a href="https://brendanjameslynskey.github.io/SimEng_10_PyTorch_ONNX_Frontends/#slide-09">Toolkit deck 10</a>). The fast-path code on slide 04 shows the corrected terms.</p>
     <div class="table-wrap">
     <table>
         <tr><th>Technique</th><th>Scenario</th><th>Before</th><th>After</th><th>Gain</th><th>Answers</th></tr>
-        <tr><td>Event abstraction (step, not token)</td><td>Defaults, 2,000 requests</td><td>506k events</td><td>36.6k events</td><td>14&times; fewer events</td><td>Same model</td></tr>
-        <tr><td>Fast path (incremental + lazy + macro)</td><td>Defaults (1P1D, 4 req/s)</td><td>0.84 s</td><td>0.37 s</td><td><strong>2.3&times;</strong></td><td>Bit-identical</td></tr>
-        <tr><td>Fast path</td><td>1k-token outputs, 1 req/s</td><td>2.59 s</td><td>1.02 s</td><td><strong>2.5&times;</strong></td><td>Bit-identical</td></tr>
-        <tr><td>Fast path</td><td>2P2D, 6 req/s</td><td>0.88 s</td><td>0.42 s</td><td><strong>2.1&times;</strong></td><td>Bit-identical</td></tr>
-        <tr><td>Probe rate (5 ms &rarr; off)</td><td>Defaults</td><td>1.25 s</td><td>0.66 s</td><td>1.9&times;</td><td>Same metrics, less timeline</td></tr>
-        <tr><td>Parallel sweep, 8 processes</td><td>8 rates</td><td>2.00 s</td><td>1.05 s</td><td>1.9&times;</td><td>Identical</td></tr>
-        <tr><td>Analytic bracket + bisection</td><td>Max load at 90% SLO</td><td>40 runs, 10.7 s</td><td>7 runs, 1.65 s</td><td><strong>6.5&times;</strong></td><td>5.97 vs 5.75 req/s (grid step 0.25)</td></tr>
+        <tr><td>Event abstraction (step, not token)</td><td>Defaults, 2,000 requests</td><td>506k events</td><td>37.1k events</td><td>14&times; fewer events</td><td>Same model</td></tr>
+        <tr><td>Fast path (incremental + lazy + macro)</td><td>Defaults (1P1D, 4 req/s)</td><td>0.74 s</td><td>0.35 s</td><td><strong>2.1&times;</strong></td><td>Bit-identical</td></tr>
+        <tr><td>Fast path</td><td>1k-token outputs, 1 req/s</td><td>2.20 s</td><td>0.87 s</td><td><strong>2.5&times;</strong></td><td>Bit-identical</td></tr>
+        <tr><td>Fast path</td><td>2P2D, 6 req/s</td><td>0.72 s</td><td>0.36 s</td><td><strong>2.0&times;</strong></td><td>Bit-identical</td></tr>
+        <tr><td>Probe rate (5 ms &rarr; off)</td><td>Defaults</td><td>1.02 s</td><td>0.55 s</td><td>1.9&times;</td><td>Same metrics, less timeline</td></tr>
+        <tr><td>Parallel sweep, 8 processes</td><td>8 rates</td><td>1.46 s</td><td>0.90 s</td><td>1.6&times;</td><td>Identical</td></tr>
+        <tr><td>Analytic bracket + bisection</td><td>Max load at 90% SLO</td><td>40 runs, 7.96 s</td><td>7 runs, 1.23 s</td><td><strong>6.5&times;</strong></td><td>5.97 vs 5.75 req/s (grid step 0.25)</td></tr>
     </table>
     </div>
     <div class="callout">
         <div class="callout-label">Reading the numbers honestly</div>
-        <p>Macro-stepping pays most when there are many steps per state change (long outputs, few arrivals per instance); with frequent arrivals it is cut short often. Adding the power model lowered the fast path's gain from 2.4&ndash;3.1&times; to 2.0&ndash;2.6&times;: the per-step DVFS and energy arithmetic is work macro-stepping cannot remove. Model fidelity costs simulator speed, and Amdahl's law (slide 14) says exactly how much. The parallel sweep is far below 8&times; because each run takes only about 0.25 s, so process start-up and data transfer dominate; with minute-long runs it approaches the core count. The largest gain came from doing fewer simulations, not faster ones.</p>
+        <p>Macro-stepping pays most when there are many steps per state change (long outputs, few arrivals per instance); with frequent arrivals it is cut short often. Adding the power model lowered the fast path's gain from 2.4&ndash;3.1&times; to 2.0&ndash;2.6&times; when it was added (2.0&ndash;2.5&times; in the current recording): the per-step DVFS and energy arithmetic is work macro-stepping cannot remove. Model fidelity costs simulator speed, and Amdahl's law (slide 14) says exactly how much. The parallel sweep is far below 8&times; because each run takes only about 0.2 s, so process start-up and data transfer dominate; with minute-long runs it approaches the core count. The largest gain came from doing fewer simulations, not faster ones.</p>
     </div>
 </section>
 
 <section class="slide" id="slide-07">
     <div class="slide-number">07</div>
     <h2>The Cost of Watching: Probes and Traces</h2>
-    <p>Sampling the system every 5 ms of simulated time nearly <strong>doubled</strong> run time (1.25 s against 0.66 s with sampling off). Probes are code, and code costs time.</p>
+    <p>Sampling the system every 5 ms of simulated time nearly <strong>doubled</strong> run time (1.02 s against 0.55 s with sampling off). Probes are code, and code costs time.</p>
     <ul>
         <li><strong>Sample on events, not on a clock,</strong> where you can: time-weighted integrals updated only when state changes are exact and cost O(changes).</li>
         <li><strong>Streaming statistics</strong> (HDR histograms, t-digests, Welford's running mean and variance) replace per-sample lists, cutting memory and append cost.</li>
@@ -1052,7 +1054,7 @@ self.commit(ends[:done], ...)</code></pre>
     </div>
     <ul>
         <li><strong>Processes, not threads</strong>, for CPU-bound Python (the GIL). Free-threaded CPython builds are changing this, but processes remain the safe default.</li>
-        <li><strong>Amdahl and overheads:</strong> 8 processes gave 1.9&times; on runs of about 0.25 s. Batch small runs into larger jobs, or reuse workers across many runs.</li>
+        <li><strong>Amdahl and overheads:</strong> 8 processes gave 1.6&times; on runs of about 0.2 s. Batch small runs into larger jobs, or reuse workers across many runs.</li>
         <li><strong>Seeds are part of the job</strong>, never drawn from a shared generator, so parallel results equal serial ones (the benchmark asserts it).</li>
         <li><strong>Scale out</strong> with job arrays on a cluster, Jenkins agents, or Ray and Dask when sweeps outgrow one machine.</li>
     </ul>
@@ -1064,7 +1066,7 @@ self.commit(ends[:done], ...)</code></pre>
     <div class="diagram-grid cols-2">
         <div class="diagram-panel accent-border">
             <h4>Multi-fidelity bracketing</h4>
-            <p>A closed-form capacity bound costs microseconds. For the defaults it says prefill caps throughput at 7.49 req/s (decode 28.6, link 74.5). The simulator then only searches below that ceiling, because the bound is optimistic by construction.</p>
+            <p>A closed-form capacity bound costs microseconds. For the defaults it says prefill caps throughput at 7.49 req/s (decode 28.8, link 74.5). The simulator then only searches below that ceiling, because the bound is optimistic by construction.</p>
         </div>
         <div class="diagram-panel accent-border">
             <h4>Bisection, not grids</h4>
@@ -1184,7 +1186,7 @@ self.commit(ends[:done], ...)</code></pre>
     <ul>
         <li><strong>Profile first.</strong> Time usually goes to model code per entity per step, not to the event kernel.</li>
         <li><strong>The biggest win is the abstraction:</strong> one event per batch step instead of per token or per layer.</li>
-        <li><strong>Incremental state, lazy bookkeeping and exact macro-stepping</strong> gave 2.0&ndash;2.6&times; with bit-identical answers, proven by differential tests.</li>
+        <li><strong>Incremental state, lazy bookkeeping and exact macro-stepping</strong> gave 2.0&ndash;2.5&times; with bit-identical answers, proven by differential tests.</li>
         <li><strong>Speculation has a price:</strong> bound the look-ahead, as in optimistic PDES.</li>
         <li><strong>Doing fewer runs beats running faster:</strong> analytic brackets plus bisection gave 6.5&times;; Bayesian optimisation and common random numbers go further.</li>
         <li><strong>Parallel across runs before parallel within a run.</strong></li>
